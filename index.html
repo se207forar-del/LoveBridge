@@ -12,6 +12,11 @@
 <body>
   <div class="bg-hearts"></div>
   <main class="app-shell">
+    <div id="mobile-status" class="mobile-status hidden">
+      <span id="mobile-time">09:41</span>
+      <span>📶 5G 🔋</span>
+    </div>
+
     <header class="topbar">
       <h1>LoveBridge</h1>
       <p>遠距離戀愛像素小宇宙</p>
@@ -48,7 +53,12 @@
     </section>
 
     <section id="game-section" class="hidden">
-      <div class="panel">
+      <div class="status-strip panel">
+        <span id="status-room">房號：--</span>
+        <span id="status-sync" class="sync-badge syncing">同步中</span>
+      </div>
+
+      <div class="panel view-panel" data-view="home">
         <h2>配對房間</h2>
         <form id="room-form" class="inline-form">
           <input id="room-code-input" type="text" placeholder="輸入 6 碼房號" maxlength="6" />
@@ -57,7 +67,7 @@
         <p>目前房號：<strong id="room-code">尚未加入</strong></p>
       </div>
 
-      <div class="panel">
+      <div class="panel view-panel" data-view="home">
         <h2>玩家卡片</h2>
         <div class="cards">
           <article class="card" id="my-card"></article>
@@ -65,7 +75,7 @@
         </div>
       </div>
 
-      <div class="panel grid-two">
+      <div class="panel grid-two view-panel" data-view="daily">
         <section>
           <h3>每日簽到</h3>
           <button id="checkin-btn">今日簽到</button>
@@ -78,7 +88,7 @@
         </section>
       </div>
 
-      <div class="panel">
+      <div class="panel view-panel" data-view="home">
         <h2>倒數計時</h2>
         <form id="timer-form" class="inline-form">
           <input type="text" name="title" placeholder="例如：下次見面" required maxlength="30" />
@@ -88,7 +98,7 @@
         <ul id="timer-list" class="list"></ul>
       </div>
 
-      <div class="panel grid-two">
+      <div class="panel grid-two view-panel" data-view="pet">
         <section>
           <h3>共養寵物 🐱</h3>
           <div id="pet-card" class="card"></div>
@@ -110,7 +120,7 @@
         </section>
       </div>
 
-      <div class="panel grid-two">
+      <div class="panel grid-two view-panel" data-view="games">
         <section>
           <h3>小遊戲：心電感應</h3>
           <p>本回合你選什麼？</p>
@@ -132,6 +142,13 @@
       <div class="panel">
         <button id="logout-btn" class="ghost">登出</button>
       </div>
+
+      <nav class="app-nav">
+        <button class="nav-btn active" data-view="home"><span>🏠</span><small>首頁</small></button>
+        <button class="nav-btn" data-view="daily"><span>🎁</span><small>每日</small></button>
+        <button class="nav-btn" data-view="pet"><span>🐱</span><small>共養</small></button>
+        <button class="nav-btn" data-view="games"><span>🎮</span><small>遊戲</small></button>
+      </nav>
     </section>
   </main>
 

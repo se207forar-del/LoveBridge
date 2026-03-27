@@ -41,12 +41,24 @@ body {
 .app-shell {
   width: min(100%, 760px);
   margin: 0 auto;
-  padding: 14px 12px 32px;
+  padding: 14px 12px 96px;
 }
 
 .topbar {
   text-align: center;
   margin-bottom: 12px;
+}
+
+.mobile-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 2px solid #ffd1e3;
+  border-radius: 999px;
+  font-size: 0.82rem;
 }
 
 h1 {
@@ -67,6 +79,110 @@ h2, h3 {
   padding: 12px;
   margin-bottom: 12px;
   box-shadow: 0 8px 0 #ffd4e5;
+}
+
+.app-nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 10px;
+  width: min(760px, calc(100% - 20px));
+  background: rgba(255, 247, 251, 0.96);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(255, 95, 150, 0.25);
+  z-index: 20;
+}
+
+.nav-btn {
+  padding: 10px 6px;
+  font-size: 0.9rem;
+  opacity: 0.75;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+}
+
+.nav-btn > span {
+  font-size: 1.05rem;
+}
+
+.nav-btn > small {
+  font-size: 0.75rem;
+}
+
+.nav-btn.active {
+  opacity: 1;
+}
+
+.view-panel {
+  display: none;
+}
+
+.view-panel.active {
+  display: block;
+  animation: slideInRight 220ms ease;
+}
+
+.view-panel.active.slide-left {
+  animation: slideInLeft 220ms ease;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.status-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 8px;
+  z-index: 6;
+}
+
+.sync-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+}
+
+.sync-badge.syncing {
+  background: #fff5d8;
+  color: #8a5b00;
+}
+
+.sync-badge.ok {
+  background: #e7f8ec;
+  color: #126a2f;
+}
+
+.sync-badge.error {
+  background: #ffe8ee;
+  color: #9d2042;
 }
 
 .grid-two {

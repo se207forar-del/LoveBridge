@@ -2,7 +2,8 @@
   const state = {
     user: null,
     roomCode: "",
-    pollingId: null
+    pollingId: null,
+    currentView: "home"
   };
 
   const $ = (s) => document.querySelector(s);
@@ -23,7 +24,13 @@
     petCard: $("#pet-card"),
     petMsg: $("#pet-msg"),
     decorCard: $("#room-decor-card"),
-    decorMsg: $("#decor-msg")
+    decorMsg: $("#decor-msg"),
+    navButtons: Array.from(document.querySelectorAll(".nav-btn")),
+    viewPanels: Array.from(document.querySelectorAll(".view-panel")),
+    statusRoom: $("#status-room"),
+    statusSync: $("#status-sync"),
+    mobileStatus: $("#mobile-status"),
+    mobileTime: $("#mobile-time")
   };
 
   function saveSession() {
@@ -66,10 +73,39 @@
     const loggedIn = !!state.user;
     ui.authSection.classList.toggle("hidden", loggedIn);
     ui.gameSection.classList.toggle("hidden", !loggedIn);
+    ui.mobileStatus?.classList.toggle("hidden", !loggedIn);
 
     if (!loggedIn) return;
+    setActiveView("home", true);
     ui.roomCode.textContent = state.roomCode || state.user.roomCode || "尚未加入";
+    if (ui.statusRoom) ui.statusRoom.textContent = `房號：${state.roomCode || state.user.roomCode || "--"}`;
     renderPlayerCards(state.user.player || null, state.user.partner || null);
+  }
+
+  function setSyncBadge(type, text) {
+    if (!ui.statusSync) return;
+    ui.statusSync.classList.remove("syncing", "ok", "error");
+    ui.statusSync.classList.add(type);
+    ui.statusSync.textContent = text;
+  }
+
+  function setActiveView(view, immediate = false) {
+    const order = { home: 0, daily: 1, pet: 2, games: 3 };
+    const prev = state.currentView || "home";
+    const left = (order[view] ?? 0) < (order[prev] ?? 0);
+    state.currentView = view;
+
+    ui.navButtons.forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.view === view);
+    });
+    ui.viewPanels.forEach((panel) => {
+      panel.classList.remove("slide-left");
+      const active = panel.dataset.view === view;
+      panel.classList.toggle("active", active);
+      if (active && !immediate && left) {
+        panel.classList.add("slide-left");
+      }
+    });
   }
 
   function renderPlayerCards(myData, partnerData) {
@@ -167,11 +203,32 @@
   }
 
   async function authedPost(resource, extra = {}) {
-    return api.post(resource, authPayload(extra));
+    try {
+      return await api.post(resource, authPayload(extra));
+    } catch (err) {
+      handleAuthFailure(err);
+      throw err;
+    }
   }
 
   async function authedGet(resource, extra = {}) {
-    return api.get(resource, authPayload(extra));
+    try {
+      return await api.get(resource, authPayload(extra));
+    } catch (err) {
+      handleAuthFailure(err);
+      throw err;
+    }
+  }
+
+  function handleAuthFailure(err) {
+    const msg = String(err?.message || "");
+    if (msg.includes("登入逾期") || msg.includes("登入狀態失效")) {
+      clearSession();
+      render();
+      setMsg(ui.authMsg, "登入已失效，請重新登入。");
+    } else {
+      setSyncBadge("error", "連線異常");
+    }
   }
 
   async function login(formData) {
@@ -205,6 +262,7 @@
   async function fetchRoomState() {
     requireLogin();
     if (!state.roomCode) return;
+    setSyncBadge("syncing", "同步中");
     const data = await authedGet("room/state", { roomCode: state.roomCode });
 
     const payload = data.data;
@@ -218,6 +276,11 @@
     renderGameStatus(payload.games || {});
     renderPet(payload.pet || null);
     renderDecor(payload.sharedRoom || null);
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+    setSyncBadge("ok", `已同步 ${hh}:${mm}:${ss}`);
   }
 
   function renderTimers(timers) {
@@ -305,6 +368,10 @@
   }
 
   function bindEvents() {
+    ui.navButtons.forEach((btn) => {
+      btn.addEventListener("click", () => setActiveView(btn.dataset.view, false));
+    });
+
     document.querySelectorAll(".tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => switchAuthTab(btn.dataset.tab));
     });
@@ -416,6 +483,7 @@
 
   async function boot() {
     bindEvents();
+    startClock();
     loadSession();
     render();
 
@@ -432,6 +500,19 @@
         }
       }
     }
+  }
+
+  function startClock() {
+    updateClock();
+    setInterval(updateClock, 1000);
+  }
+
+  function updateClock() {
+    if (!ui.mobileTime) return;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    ui.mobileTime.textContent = `${hh}:${mm}`;
   }
 
   boot();

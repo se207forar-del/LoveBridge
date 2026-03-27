@@ -8,7 +8,7 @@ const SHEETS = {
   },
   sessions: {
     name: 'Sessions',
-    headers: ['sessionId', 'userId', 'token', 'expiresAt', 'createdAt', 'lastSeenAt']
+    headers: ['sessionId', 'userId', 'token', 'expiresAt', 'expiresAtTs', 'createdAt', 'lastSeenAt']
   },
   rooms: {
     name: 'Rooms',
@@ -174,7 +174,7 @@ function handleLogin(body) {
     }, usersSheet);
   }
 
-  const session = createSession(user.userId);
+  const session = issueAuthToken(user.userId);
   const room = user.roomCode ? findRoomByCode(user.roomCode) : null;
   const partner = room ? findPartnerInRoom(room, user.userId) : null;
 
@@ -715,37 +715,114 @@ function bumpRoomShared(roomCode, affectionAdd, expAdd) {
   });
 }
 
-function createSession(userId) {
+function createSession(userId, tokenOpt, expMsOpt) {
   const now = new Date();
-  const expires = new Date(now.getTime() + SESSION_TTL_DAYS * 86400000);
-  const token = randomToken(24);
+  const expMs = Number(expMsOpt || (now.getTime() + SESSION_TTL_DAYS * 86400000));
+  const expires = new Date(expMs);
+  const token = tokenOpt || randomToken(24);
+  const expiresAt = Utilities.formatDate(expires, TZ, "yyyy-MM-dd'T'HH:mm:ss");
+  const expiresAtTs = expMs;
 
   appendRow(useSheet(SHEETS.sessions), SHEETS.sessions.headers, {
     sessionId: id6('S'),
     userId: userId,
     token: token,
-    expiresAt: Utilities.formatDate(expires, TZ, "yyyy-MM-dd'T'HH:mm:ss"),
+    expiresAt: expiresAt,
+    expiresAtTs: expiresAtTs,
     createdAt: nowIso(),
     lastSeenAt: nowIso()
   });
 
   return {
     token: token,
-    expiresAt: Utilities.formatDate(expires, TZ, "yyyy-MM-dd'T'HH:mm:ss")
+    expiresAt: expiresAt
   };
 }
 
 function verifySession(userId, token) {
+  const signed = verifySignedToken(userId, token);
+  if (signed.ok) return userId;
+
   const sessions = readSheet(useSheet(SHEETS.sessions));
   const found = sessions.find((s) => s.userId === userId && s.token === token);
   if (!found) throw new Error('登入狀態失效，請重新登入');
 
-  const expiresTs = new Date(String(found.expiresAt).replace(' ', 'T')).getTime();
+  const expiresTs = parseExpiresTs(found);
   if (!expiresTs || expiresTs < Date.now()) {
     throw new Error('登入逾期，請重新登入');
   }
 
   return userId;
+}
+
+function issueAuthToken(userId) {
+  const expMs = Date.now() + SESSION_TTL_DAYS * 86400000;
+  const payloadObj = { u: userId, e: expMs, n: id6('N') };
+  const payload = Utilities.base64EncodeWebSafe(JSON.stringify(payloadObj));
+  const sig = sha256(payload + '.' + getTokenSecret());
+  const token = 'LB1.' + payload + '.' + sig;
+
+  // 保留舊 sessions 記錄做相容與追蹤，不作為唯一驗證依據
+  try {
+    createSession(userId, token, expMs);
+  } catch (e) {}
+
+  return {
+    token: token,
+    expiresAt: Utilities.formatDate(new Date(expMs), TZ, "yyyy-MM-dd'T'HH:mm:ss")
+  };
+}
+
+function verifySignedToken(userId, token) {
+  try {
+    const raw = String(token || '');
+    if (!raw.startsWith('LB1.')) return { ok: false };
+    const parts = raw.split('.');
+    if (parts.length !== 3) return { ok: false };
+
+    const payload = parts[1];
+    const sig = parts[2];
+    const expected = sha256(payload + '.' + getTokenSecret());
+    if (sig !== expected) return { ok: false };
+
+    const json = Utilities.newBlob(Utilities.base64DecodeWebSafe(payload)).getDataAsString();
+    const obj = JSON.parse(json);
+    if (String(obj.u) !== String(userId)) return { ok: false };
+    if (!Number(obj.e) || Number(obj.e) < Date.now()) return { ok: false };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+
+function getTokenSecret() {
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty('LB_TOKEN_SECRET');
+  if (!secret) {
+    secret = randomToken(20);
+    props.setProperty('LB_TOKEN_SECRET', secret);
+  }
+  return secret;
+}
+
+function parseExpiresTs(sessionRow) {
+  const numericTs = Number(sessionRow.expiresAtTs || 0);
+  if (Number.isFinite(numericTs) && numericTs > 0) return numericTs;
+
+  const raw = sessionRow.expiresAt;
+  if (raw instanceof Date) return raw.getTime();
+
+  const str = String(raw || '').trim();
+  if (!str) return 0;
+
+  const parsedIso = new Date(str.replace(' ', 'T')).getTime();
+  if (Number.isFinite(parsedIso) && parsedIso > 0) return parsedIso;
+
+  const normalized = str.replace(/\//g, '-');
+  const parsedLocal = new Date(normalized).getTime();
+  if (Number.isFinite(parsedLocal) && parsedLocal > 0) return parsedLocal;
+
+  return 0;
 }
 
 function touchSession(userId) {
