@@ -1,0 +1,142 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LoveBridge 遠距離戀愛遊戲</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <div class="bg-hearts"></div>
+  <main class="app-shell">
+    <header class="topbar">
+      <h1>LoveBridge</h1>
+      <p>遠距離戀愛像素小宇宙</p>
+    </header>
+
+    <section id="auth-section" class="panel">
+      <h2>註冊 / 登入</h2>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="login">登入</button>
+        <button class="tab-btn" data-tab="register">註冊</button>
+      </div>
+      <form id="login-form" class="auth-form active">
+        <label>帳號
+          <input type="text" name="username" required maxlength="20" />
+        </label>
+        <label>密碼
+          <input type="password" name="password" required maxlength="20" />
+        </label>
+        <button type="submit">登入</button>
+      </form>
+      <form id="register-form" class="auth-form">
+        <label>暱稱
+          <input type="text" name="nickname" required maxlength="20" />
+        </label>
+        <label>帳號
+          <input type="text" name="username" required maxlength="20" />
+        </label>
+        <label>密碼
+          <input type="password" name="password" required maxlength="20" />
+        </label>
+        <button type="submit">註冊</button>
+      </form>
+      <p id="auth-msg" class="msg"></p>
+    </section>
+
+    <section id="game-section" class="hidden">
+      <div class="panel">
+        <h2>配對房間</h2>
+        <form id="room-form" class="inline-form">
+          <input id="room-code-input" type="text" placeholder="輸入 6 碼房號" maxlength="6" />
+          <button type="submit">加入 / 建立</button>
+        </form>
+        <p>目前房號：<strong id="room-code">尚未加入</strong></p>
+      </div>
+
+      <div class="panel">
+        <h2>玩家卡片</h2>
+        <div class="cards">
+          <article class="card" id="my-card"></article>
+          <article class="card" id="partner-card"></article>
+        </div>
+      </div>
+
+      <div class="panel grid-two">
+        <section>
+          <h3>每日簽到</h3>
+          <button id="checkin-btn">今日簽到</button>
+          <p id="checkin-msg" class="msg"></p>
+        </section>
+        <section>
+          <h3>抽卡 / 禮物</h3>
+          <button id="draw-btn">抽一張禮物卡</button>
+          <p id="gift-msg" class="msg"></p>
+        </section>
+      </div>
+
+      <div class="panel">
+        <h2>倒數計時</h2>
+        <form id="timer-form" class="inline-form">
+          <input type="text" name="title" placeholder="例如：下次見面" required maxlength="30" />
+          <input type="date" name="targetDate" required />
+          <button type="submit">新增倒數</button>
+        </form>
+        <ul id="timer-list" class="list"></ul>
+      </div>
+
+      <div class="panel grid-two">
+        <section>
+          <h3>共養寵物 🐱</h3>
+          <div id="pet-card" class="card"></div>
+          <div class="choices">
+            <button id="feed-btn" data-food="魚肉罐頭">餵魚肉罐頭</button>
+            <button id="feed-snack-btn" data-food="小餅乾">餵小餅乾</button>
+          </div>
+          <p id="pet-msg" class="msg"></p>
+        </section>
+        <section>
+          <h3>小房間 🏠</h3>
+          <div id="room-decor-card" class="card"></div>
+          <div class="choices" id="decor-choices">
+            <button data-item="粉色壁紙">粉色壁紙</button>
+            <button data-item="草莓地毯">草莓地毯</button>
+            <button data-item="星星夜燈">星星夜燈</button>
+          </div>
+          <p id="decor-msg" class="msg"></p>
+        </section>
+      </div>
+
+      <div class="panel grid-two">
+        <section>
+          <h3>小遊戲：心電感應</h3>
+          <p>本回合你選什麼？</p>
+          <div class="choices" id="telepathy-choices">
+            <button data-choice="愛心">愛心</button>
+            <button data-choice="擁抱">擁抱</button>
+            <button data-choice="親親">親親</button>
+          </div>
+          <p id="telepathy-msg" class="msg"></p>
+        </section>
+        <section>
+          <h3>小遊戲：同步點擊</h3>
+          <button id="click-btn">現在點擊</button>
+          <p id="click-msg" class="msg"></p>
+          <p id="click-status" class="tiny"></p>
+        </section>
+      </div>
+
+      <div class="panel">
+        <button id="logout-btn" class="ghost">登出</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
