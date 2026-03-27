@@ -202,6 +202,28 @@ h2, h3 {
   background: #fff;
 }
 
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hub-card {
+  text-align: left;
+  background: linear-gradient(160deg, #ffe7f2, #ffd2e7);
+  color: #5d3a50;
+  border: 2px solid #ffc0da;
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+  box-shadow: 0 6px 0 #ffcce0;
+}
+
+.hub-card small {
+  color: #805267;
+}
+
 .avatar {
   width: 52px;
   height: 52px;
@@ -348,6 +370,67 @@ label {
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.9); }
   to { opacity: 1; transform: scale(1); }
+}
+
+.draw-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 22, 33, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+
+.draw-box {
+  width: min(92vw, 360px);
+  background: #fff8fc;
+  border: 3px solid #ffc7de;
+  border-radius: 18px;
+  padding: 14px;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.draw-stage {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.draw-card {
+  margin: 8px auto 12px;
+  width: 180px;
+  height: 220px;
+  border-radius: 14px;
+  border: 2px solid #ffc4dc;
+  display: grid;
+  place-items: center;
+  font-size: 2.1rem;
+  background: linear-gradient(145deg, #ffe7f2, #ffd2e7);
+  color: #8a4d68;
+  transform-style: preserve-3d;
+}
+
+.draw-card.spinning {
+  animation: cardSpin 900ms linear infinite;
+}
+
+.draw-card.reveal {
+  animation: cardReveal 420ms ease;
+}
+
+.draw-card.ssr { background: linear-gradient(130deg, #fff3ab, #ffd76a); color: #7b5300; }
+.draw-card.sr { background: linear-gradient(130deg, #ffd9ec, #ffb7dc); color: #8d3e61; }
+.draw-card.r { background: linear-gradient(130deg, #def2ff, #bfdfff); color: #295577; }
+.draw-card.n { background: linear-gradient(130deg, #f0f0f0, #e4e4e4); color: #616161; }
+
+@keyframes cardSpin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes cardReveal {
+  from { transform: scale(0.8); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 .meter {

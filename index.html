@@ -67,6 +67,28 @@
         <p>目前房號：<strong id="room-code">尚未加入</strong></p>
       </div>
 
+      <div class="panel view-panel active" data-view="home">
+        <h2>功能入口</h2>
+        <div class="hub-grid" id="hub-grid">
+          <button class="hub-card" data-go-view="daily">
+            <strong>每日任務</strong>
+            <small>簽到、抽卡、物品庫</small>
+          </button>
+          <button class="hub-card" data-go-view="pet">
+            <strong>共養寵物</strong>
+            <small>餵食、改名、裝飾互動</small>
+          </button>
+          <button class="hub-card" data-go-view="games">
+            <strong>雙人遊戲</strong>
+            <small>心電感應、同步挑戰</small>
+          </button>
+          <button class="hub-card" data-go-view="home">
+            <strong>D-Day 倒數</strong>
+            <small>紀念日、下次見面</small>
+          </button>
+        </div>
+      </div>
+
       <div class="panel view-panel" data-view="home">
         <h2>玩家卡片</h2>
         <div class="cards">
@@ -163,6 +185,14 @@
       </nav>
     </section>
   </main>
+
+  <section id="draw-modal" class="draw-modal hidden" aria-hidden="true">
+    <div class="draw-box">
+      <div id="draw-stage" class="draw-stage">準備抽卡...</div>
+      <div id="draw-card" class="draw-card">?</div>
+      <button id="draw-close-btn" class="ghost" type="button">關閉</button>
+    </div>
+  </section>
 
   <script src="assets/js/config.js"></script>
   <script src="assets/js/api.js"></script>

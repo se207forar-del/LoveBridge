@@ -29,12 +29,16 @@
     decorMsg: $("#decor-msg"),
     inventoryList: $("#inventory-list"),
     roomPanel: $("#room-panel"),
+    hubGrid: $("#hub-grid"),
     navButtons: Array.from(document.querySelectorAll(".nav-btn")),
     viewPanels: Array.from(document.querySelectorAll(".view-panel")),
     statusRoom: $("#status-room"),
     statusSync: $("#status-sync"),
     mobileStatus: $("#mobile-status"),
-    mobileTime: $("#mobile-time")
+    mobileTime: $("#mobile-time"),
+    drawModal: $("#draw-modal"),
+    drawStage: $("#draw-stage"),
+    drawCard: $("#draw-card")
   };
 
   function saveSession() {
@@ -340,6 +344,7 @@
   async function drawGift() {
     const data = await authedPost("gifts/draw", { roomCode: state.roomCode });
     const rarity = String(data.data.rarity || "N").toLowerCase();
+    await playDrawAnimation(data.data);
     ui.drawResult?.classList.remove("hidden", "n", "r", "sr", "ssr");
     ui.drawResult?.classList.add(rarity);
     if (ui.drawResult) {
@@ -349,6 +354,34 @@
     if (ui.drawRemain) ui.drawRemain.textContent = `今日剩餘抽卡次數：${num(data.data.drawRemaining)}`;
     await loadInventory();
     await fetchRoomState();
+  }
+
+  async function playDrawAnimation(item) {
+    if (!ui.drawModal || !ui.drawCard || !ui.drawStage) return;
+    const rarity = String(item.rarity || "N").toLowerCase();
+    ui.drawModal.classList.remove("hidden");
+    ui.drawModal.setAttribute("aria-hidden", "false");
+    ui.drawStage.textContent = "連線命運中...";
+    ui.drawCard.className = "draw-card spinning";
+    ui.drawCard.textContent = "💝";
+    await delay(900);
+
+    ui.drawStage.textContent = "翻牌中...";
+    await delay(700);
+
+    ui.drawCard.className = `draw-card reveal ${rarity}`;
+    ui.drawCard.textContent = item.cardName || "神秘禮物";
+    ui.drawStage.textContent = `你抽到【${item.rarity}】`;
+  }
+
+  function closeDrawModal() {
+    if (!ui.drawModal) return;
+    ui.drawModal.classList.add("hidden");
+    ui.drawModal.setAttribute("aria-hidden", "true");
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function addTimer(formData) {
@@ -445,6 +478,11 @@
     ui.navButtons.forEach((btn) => {
       btn.addEventListener("click", () => setActiveView(btn.dataset.view, false));
     });
+    ui.hubGrid?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-go-view]");
+      if (!btn) return;
+      setActiveView(btn.dataset.goView, false);
+    });
 
     document.querySelectorAll(".tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => switchAuthTab(btn.dataset.tab));
@@ -502,6 +540,10 @@
       } catch (err) {
         setMsg(ui.giftMsg, err.message);
       }
+    });
+    $("#draw-close-btn")?.addEventListener("click", closeDrawModal);
+    ui.drawModal?.addEventListener("click", (e) => {
+      if (e.target === ui.drawModal) closeDrawModal();
     });
 
     $("#timer-form").addEventListener("submit", async (e) => {
