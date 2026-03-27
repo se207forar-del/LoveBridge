@@ -20,7 +20,11 @@ const SHEETS = {
   },
   gifts: {
     name: 'GiftsLog',
-    headers: ['logId', 'roomCode', 'userId', 'cardName', 'rarity', 'effectType', 'effectValue', 'createdAt']
+    headers: ['logId', 'roomCode', 'userId', 'cardName', 'rarity', 'itemType', 'effectType', 'effectValue', 'target', 'drawDate', 'createdAt']
+  },
+  inventory: {
+    name: 'Inventory',
+    headers: ['inventoryId', 'userId', 'roomCode', 'itemCode', 'itemName', 'itemType', 'rarity', 'color', 'target', 'effectType', 'effectValue', 'qty', 'acquiredAt', 'updatedAt']
   },
   timers: {
     name: 'Timers',
@@ -36,7 +40,7 @@ const SHEETS = {
   },
   sharedPet: {
     name: 'SharedPet',
-    headers: ['roomCode', 'petType', 'petName', 'level', 'exp', 'hunger', 'mood', 'roomTheme', 'decorScore', 'lastDecorItem', 'lastFedAt', 'updatedAt', 'createdAt']
+    headers: ['roomCode', 'petType', 'petName', 'level', 'exp', 'hunger', 'mood', 'reaction', 'roomTheme', 'decorScore', 'lastDecorItem', 'lastFedAt', 'updatedAt', 'createdAt']
   },
   petLogs: {
     name: 'PetLogs',
@@ -101,6 +105,12 @@ function doPost(e) {
         return jsonOk(handlePetFeed(authUserId, body), '餵食成功');
       case 'pet/decorate':
         return jsonOk(handlePetDecorate(authUserId, body), '裝飾成功');
+      case 'pet/rename':
+        return jsonOk(handlePetRename(authUserId, body), '寵物名稱已更新');
+      case 'inventory/list':
+        return jsonOk(handleInventoryList(authUserId, body), '物品庫讀取成功');
+      case 'inventory/use':
+        return jsonOk(handleInventoryUse(authUserId, body), '道具已使用');
       default:
         return jsonError('找不到 POST 路由: ' + resource, 404);
     }
@@ -274,6 +284,11 @@ function handleCreateTimer(authUserId, body) {
 function handleDrawGift(authUserId, body) {
   const roomCode = normalizeRoomCode(required(body.roomCode, 'roomCode'));
   mustMembership(authUserId, roomCode);
+  const today = getTodayYmd();
+  const drawCount = getUserDrawCountToday(authUserId, today);
+  if (drawCount >= 2) {
+    throw new Error('今日抽卡次數已用完（每日 2 次）');
+  }
 
   const card = drawCardFromPool();
   appendRow(useSheet(SHEETS.gifts), SHEETS.gifts.headers, {
@@ -282,23 +297,26 @@ function handleDrawGift(authUserId, body) {
     userId: authUserId,
     cardName: card.cardName,
     rarity: card.rarity,
+    itemType: card.itemType,
     effectType: card.effectType,
     effectValue: card.effectValue,
+    target: card.target,
+    drawDate: today,
     createdAt: nowIso()
   });
 
-  applyGiftEffect(authUserId, roomCode, card);
-  return card;
+  addInventoryItem(authUserId, roomCode, card);
+  return Object.assign({}, card, { drawRemaining: Math.max(0, 1 - drawCount) });
 }
 
 function drawCardFromPool() {
   const pool = [
-    { rarity: 'SSR', weight: 3, cardName: '星願戒指', effectType: 'affection', effectValue: 24 },
-    { rarity: 'SR', weight: 10, cardName: '戀愛日記', effectType: 'exp', effectValue: 40 },
-    { rarity: 'SR', weight: 10, cardName: '蜜桃奶昔', effectType: 'mp', effectValue: 24 },
-    { rarity: 'R', weight: 27, cardName: '暖手抱枕', effectType: 'hp', effectValue: 20 },
-    { rarity: 'R', weight: 25, cardName: '布丁甜點', effectType: 'affection', effectValue: 12 },
-    { rarity: 'N', weight: 25, cardName: '草莓糖果', effectType: 'exp', effectValue: 16 }
+    { rarity: 'SSR', weight: 2, cardName: '虹彩禮服', itemType: 'outfit', color: '彩虹', target: 'partner', effectType: 'exp', effectValue: 36 },
+    { rarity: 'SR', weight: 10, cardName: '玫瑰洋裝', itemType: 'outfit', color: '紅', target: 'partner', effectType: 'exp', effectValue: 24 },
+    { rarity: 'SR', weight: 12, cardName: '星夜披風', itemType: 'outfit', color: '藍', target: 'partner', effectType: 'affection', effectValue: 18 },
+    { rarity: 'R', weight: 26, cardName: '草莓罐頭', itemType: 'pet_food', color: '粉', target: 'pet', effectType: 'pet_hunger', effectValue: 16 },
+    { rarity: 'R', weight: 24, cardName: '奶油餅乾', itemType: 'pet_food', color: '米', target: 'pet', effectType: 'pet_mood', effectValue: 12 },
+    { rarity: 'N', weight: 26, cardName: '蝴蝶結貼紙', itemType: 'pet_decor', color: '粉', target: 'pet', effectType: 'pet_decor', effectValue: 8 }
   ];
 
   const sum = pool.reduce(function (acc, c) { return acc + c.weight; }, 0);
@@ -315,8 +333,12 @@ function drawCardFromPool() {
 
   const effectText = giftEffectText(pick.effectType, pick.effectValue);
   return {
+    itemCode: id6('IT'),
     rarity: pick.rarity,
     cardName: pick.cardName,
+    itemType: pick.itemType,
+    color: pick.color,
+    target: pick.target,
     effectType: pick.effectType,
     effectValue: pick.effectValue,
     effectText: effectText
@@ -327,6 +349,9 @@ function giftEffectText(type, value) {
   if (type === 'hp') return 'HP +' + value;
   if (type === 'mp') return 'MP +' + value;
   if (type === 'exp') return 'EXP +' + value;
+  if (type === 'pet_hunger') return '寵物飽食 +' + value;
+  if (type === 'pet_mood') return '寵物心情 +' + value;
+  if (type === 'pet_decor') return '房間裝飾 +' + value;
   return '好感 +' + value;
 }
 
@@ -470,6 +495,7 @@ function handlePetFeed(authUserId, body) {
     mood: clamp100(Number(pet.mood || 0) + effects.mood),
     exp: next.exp,
     level: next.level,
+    reaction: '好吃！喵～',
     lastFedAt: nowIso(),
     updatedAt: nowIso()
   };
@@ -509,6 +535,7 @@ function handlePetDecorate(authUserId, body) {
     mood: clamp100(Number(pet.mood || 0) + effect.mood),
     exp: next.exp,
     level: next.level,
+    reaction: '喵嗚！房間變漂亮了！',
     updatedAt: nowIso()
   });
 
@@ -525,6 +552,58 @@ function handlePetDecorate(authUserId, body) {
   return { message: '你們一起擺上「' + item + '」，小房間變得更可愛了！' };
 }
 
+function handlePetRename(authUserId, body) {
+  const roomCode = normalizeRoomCode(required(body.roomCode, 'roomCode'));
+  mustMembership(authUserId, roomCode);
+  const petName = required(body.petName, 'petName').trim().slice(0, 16);
+  if (!petName) throw new Error('寵物名稱不可為空');
+  updatePetFields(roomCode, { petName: petName, reaction: '喵？新名字好喜歡！', updatedAt: nowIso() });
+  return { petName: petName };
+}
+
+function handleInventoryList(authUserId, body) {
+  const roomCode = normalizeRoomCode(required(body.roomCode, 'roomCode'));
+  mustMembership(authUserId, roomCode);
+  const rows = readSheet(useSheet(SHEETS.inventory))
+    .filter((r) => r.userId === authUserId && r.roomCode === roomCode && Number(r.qty || 0) > 0)
+    .sort(function (a, b) { return String(b.updatedAt).localeCompare(String(a.updatedAt)); });
+
+  return {
+    items: rows.map(function (r) {
+      return {
+        inventoryId: r.inventoryId,
+        itemName: r.itemName,
+        itemType: r.itemType,
+        rarity: r.rarity,
+        color: r.color,
+        target: r.target,
+        effectType: r.effectType,
+        effectValue: Number(r.effectValue || 0),
+        qty: Number(r.qty || 0)
+      };
+    })
+  };
+}
+
+function handleInventoryUse(authUserId, body) {
+  const roomCode = normalizeRoomCode(required(body.roomCode, 'roomCode'));
+  mustMembership(authUserId, roomCode);
+  const inventoryId = required(body.inventoryId, 'inventoryId');
+  const targetMode = String(body.targetMode || 'partner');
+  const invSheet = useSheet(SHEETS.inventory);
+  const rows = readSheet(invSheet);
+  const item = rows.find((r) => r.inventoryId === inventoryId && r.userId === authUserId && r.roomCode === roomCode);
+  if (!item) throw new Error('找不到該物品');
+  if (Number(item.qty || 0) <= 0) throw new Error('物品數量不足');
+
+  applyInventoryEffect(roomCode, authUserId, item, targetMode);
+  updateRowByKey(invSheet, SHEETS.inventory.headers, 'inventoryId', inventoryId, {
+    qty: Number(item.qty || 0) - 1,
+    updatedAt: nowIso()
+  });
+  return { message: '已使用 ' + item.itemName, itemName: item.itemName };
+}
+
 function handleRoomState(authUserId, roomCodeRaw) {
   const roomCode = normalizeRoomCode(required(roomCodeRaw, 'roomCode'));
   const room = mustMembership(authUserId, roomCode);
@@ -538,6 +617,8 @@ function handleRoomState(authUserId, roomCodeRaw) {
   };
 
   const pet = ensureSharedPet(roomCode);
+  const today = getTodayYmd();
+  const drawCountToday = getUserDrawCountToday(authUserId, today);
   updateRoomFields(roomCode, { lastSyncAt: nowIso(), updatedAt: nowIso() });
   touchSession(authUserId);
 
@@ -553,7 +634,8 @@ function handleRoomState(authUserId, roomCodeRaw) {
       level: Number(pet.level || 1),
       exp: Number(pet.exp || 0),
       hunger: Number(pet.hunger || 0),
-      mood: Number(pet.mood || 0)
+      mood: Number(pet.mood || 0),
+      reaction: pet.reaction || ''
     },
     sharedRoom: {
       theme: pet.roomTheme || '溫馨粉色',
@@ -562,27 +644,43 @@ function handleRoomState(authUserId, roomCodeRaw) {
     },
     roomMeta: {
       sharedAffection: Number(room.sharedAffection || 0),
-      sharedExp: Number(room.sharedExp || 0)
+      sharedExp: Number(room.sharedExp || 0),
+      paired: !!(room.userA && room.userB)
+    },
+    daily: {
+      drawRemaining: Math.max(0, 2 - drawCountToday)
     }
   };
 }
 
 function listRoomTimers(roomCode) {
   const rows = readSheet(useSheet(SHEETS.timers)).filter((r) => r.roomCode === roomCode);
-  const today = new Date(Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'));
+  const todayYmd = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const todayDays = ymdToUtcDays(todayYmd);
 
   return rows
     .map((r) => {
-      const target = new Date(String(r.targetDate) + 'T00:00:00');
-      const daysLeft = Math.ceil((target - today) / 86400000);
+      const targetYmd = String(r.targetDate).slice(0, 10);
+      const targetDays = ymdToUtcDays(targetYmd);
+      const daysLeft = targetDays - todayDays;
       return {
         timerId: r.timerId,
         title: r.title,
-        targetDate: String(r.targetDate),
+        targetDate: targetYmd,
         daysLeft: daysLeft
       };
     })
     .sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+function ymdToUtcDays(ymd) {
+  const parts = String(ymd || '').split('-');
+  if (parts.length !== 3) return 0;
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!y || !m || !d) return 0;
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
 }
 
 function lastTelepathyResult(roomCode) {
@@ -644,6 +742,71 @@ function computePlayerGrowth(user, addExp, addAffection) {
   return { exp: exp, affection: affection, level: level, hp: hp, mp: mp };
 }
 
+function getTodayYmd() {
+  return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+}
+
+function getUserDrawCountToday(userId, ymd) {
+  return readSheet(useSheet(SHEETS.gifts))
+    .filter(function (r) { return r.userId === userId && String(r.drawDate || '') === ymd; })
+    .length;
+}
+
+function addInventoryItem(userId, roomCode, card) {
+  const invSheet = useSheet(SHEETS.inventory);
+  const all = readSheet(invSheet);
+  const existing = all.find(function (r) {
+    return r.userId === userId && r.roomCode === roomCode && r.itemName === card.cardName && r.rarity === card.rarity;
+  });
+
+  if (existing) {
+    updateRowByKey(invSheet, SHEETS.inventory.headers, 'inventoryId', existing.inventoryId, {
+      qty: Number(existing.qty || 0) + 1,
+      updatedAt: nowIso()
+    });
+    return;
+  }
+
+  appendRow(invSheet, SHEETS.inventory.headers, {
+    inventoryId: id6('IV'),
+    userId: userId,
+    roomCode: roomCode,
+    itemCode: card.itemCode,
+    itemName: card.cardName,
+    itemType: card.itemType,
+    rarity: card.rarity,
+    color: card.color || '',
+    target: card.target || '',
+    effectType: card.effectType,
+    effectValue: card.effectValue,
+    qty: 1,
+    acquiredAt: nowIso(),
+    updatedAt: nowIso()
+  });
+}
+
+function applyInventoryEffect(roomCode, userId, item, targetMode) {
+  const room = mustRoom(roomCode);
+  const partnerId = room.userA === userId ? room.userB : room.userA;
+  const targetUser = targetMode === 'self' ? userId : partnerId || userId;
+
+  if (item.itemType === 'outfit') {
+    if (item.effectType === 'exp') addPlayerRewards(targetUser, Number(item.effectValue || 0), 0);
+    if (item.effectType === 'affection') addPlayerRewards(targetUser, 0, Number(item.effectValue || 0));
+    return;
+  }
+
+  const pet = ensureSharedPet(roomCode);
+  const patch = { updatedAt: nowIso(), reaction: '喵！謝謝你們的禮物！' };
+  if (item.effectType === 'pet_hunger') patch.hunger = clamp100(Number(pet.hunger || 0) + Number(item.effectValue || 0));
+  if (item.effectType === 'pet_mood') patch.mood = clamp100(Number(pet.mood || 0) + Number(item.effectValue || 0));
+  if (item.effectType === 'pet_decor') {
+    patch.decorScore = Number(pet.decorScore || 0) + Number(item.effectValue || 0);
+    patch.lastDecorItem = item.itemName;
+  }
+  updatePetFields(roomCode, patch);
+}
+
 function applyGiftEffect(userId, roomCode, card) {
   if (card.effectType === 'exp') {
     addPlayerRewards(userId, card.effectValue, 0);
@@ -675,6 +838,7 @@ function ensureSharedPet(roomCode) {
     exp: 0,
     hunger: 55,
     mood: 55,
+    reaction: '喵～今天也要一起玩！',
     roomTheme: '溫馨粉色',
     decorScore: 0,
     lastDecorItem: '',

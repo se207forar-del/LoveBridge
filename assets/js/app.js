@@ -17,6 +17,8 @@
     partnerCard: $("#partner-card"),
     checkinMsg: $("#checkin-msg"),
     giftMsg: $("#gift-msg"),
+    drawRemain: $("#draw-remain"),
+    drawResult: $("#draw-result"),
     telepathyMsg: $("#telepathy-msg"),
     clickMsg: $("#click-msg"),
     clickStatus: $("#click-status"),
@@ -25,6 +27,8 @@
     petMsg: $("#pet-msg"),
     decorCard: $("#room-decor-card"),
     decorMsg: $("#decor-msg"),
+    inventoryList: $("#inventory-list"),
+    roomPanel: $("#room-panel"),
     navButtons: Array.from(document.querySelectorAll(".nav-btn")),
     viewPanels: Array.from(document.querySelectorAll(".view-panel")),
     statusRoom: $("#status-room"),
@@ -79,6 +83,7 @@
     setActiveView("home", true);
     ui.roomCode.textContent = state.roomCode || state.user.roomCode || "尚未加入";
     if (ui.statusRoom) ui.statusRoom.textContent = `房號：${state.roomCode || state.user.roomCode || "--"}`;
+    if (ui.roomPanel) ui.roomPanel.classList.remove("hidden");
     renderPlayerCards(state.user.player || null, state.user.partner || null);
   }
 
@@ -143,7 +148,7 @@
 
     ui.petCard.innerHTML = `
       <div class="row">
-        <div class="avatar">${escapeHtml(pet.petType || "🐱")}</div>
+        <div class="avatar pet-emoji" id="pet-emoji">${escapeHtml(pet.petType || "🐱")}</div>
         <div>
           <strong>${escapeHtml(pet.petName || "小可愛")}</strong><br>
           <small>Lv.${num(pet.level)} | EXP ${num(pet.exp)}</small>
@@ -153,6 +158,7 @@
       <div class="meter"><span style="width:${clampPct(pet.hunger)}%"></span></div>
       <div class="tiny">心情：${num(pet.mood)} / 100</div>
       <div class="meter"><span style="width:${clampPct(pet.mood)}%"></span></div>
+      <div class="tiny">${escapeHtml(pet.reaction || "喵～")}</div>
     `;
   }
 
@@ -239,6 +245,7 @@
     render();
     if (state.roomCode) {
       await fetchRoomState();
+      await loadInventory();
       startPolling();
     }
   }
@@ -256,6 +263,7 @@
     saveSession();
     render();
     await fetchRoomState();
+    await loadInventory();
     startPolling();
   }
 
@@ -276,6 +284,12 @@
     renderGameStatus(payload.games || {});
     renderPet(payload.pet || null);
     renderDecor(payload.sharedRoom || null);
+    if (ui.drawRemain) {
+      ui.drawRemain.textContent = `今日剩餘抽卡次數：${num(payload.daily?.drawRemaining)}`;
+    }
+    if (ui.roomPanel) {
+      ui.roomPanel.classList.toggle("hidden", !!payload.roomMeta?.paired);
+    }
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, "0");
     const mm = String(now.getMinutes()).padStart(2, "0");
@@ -325,7 +339,15 @@
 
   async function drawGift() {
     const data = await authedPost("gifts/draw", { roomCode: state.roomCode });
-    setMsg(ui.giftMsg, `抽到【${data.data.rarity}】${data.data.cardName}，${data.data.effectText}`, true);
+    const rarity = String(data.data.rarity || "N").toLowerCase();
+    ui.drawResult?.classList.remove("hidden", "n", "r", "sr", "ssr");
+    ui.drawResult?.classList.add(rarity);
+    if (ui.drawResult) {
+      ui.drawResult.innerHTML = `\n        <strong>【${escapeHtml(data.data.rarity)}】${escapeHtml(data.data.cardName)}</strong><br>\n        <small>${escapeHtml(data.data.effectText)}</small>\n      `;
+    }
+    setMsg(ui.giftMsg, `已加入物品庫，可送給伴侶或用在寵物。`, true);
+    if (ui.drawRemain) ui.drawRemain.textContent = `今日剩餘抽卡次數：${num(data.data.drawRemaining)}`;
+    await loadInventory();
     await fetchRoomState();
   }
 
@@ -358,13 +380,65 @@
   async function feedPet(food) {
     const data = await authedPost("pet/feed", { roomCode: state.roomCode, food });
     setMsg(ui.petMsg, data.data?.message || data.message, true);
+    flashPetReaction();
     await fetchRoomState();
   }
 
   async function decorateRoom(item) {
     const data = await authedPost("pet/decorate", { roomCode: state.roomCode, item });
     setMsg(ui.decorMsg, data.data?.message || data.message, true);
+    flashPetReaction();
     await fetchRoomState();
+  }
+
+  async function renamePet(formData) {
+    const data = await authedPost("pet/rename", {
+      roomCode: state.roomCode,
+      ...Object.fromEntries(formData.entries())
+    });
+    setMsg(ui.petMsg, `寵物改名成功：${data.data.petName}`, true);
+    flashPetReaction();
+    await fetchRoomState();
+  }
+
+  async function loadInventory() {
+    const data = await authedPost("inventory/list", { roomCode: state.roomCode });
+    renderInventory(data.data.items || []);
+  }
+
+  function renderInventory(items) {
+    if (!ui.inventoryList) return;
+    if (!items.length) {
+      ui.inventoryList.innerHTML = "<li>物品庫目前是空的，去抽卡吧！</li>";
+      return;
+    }
+    ui.inventoryList.innerHTML = items.map((it) => {
+      return `<li>
+        【${escapeHtml(it.rarity)}】${escapeHtml(it.itemName)} x${num(it.qty)}
+        <button class=\"ghost use-item-btn\" data-id=\"${escapeHtml(it.inventoryId)}\" data-target=\"${escapeHtml(it.target || "")}\">使用</button>
+      </li>`;
+    }).join("");
+  }
+
+  async function useInventoryItem(inventoryId, target) {
+    const targetMode = target === "partner" ? "partner" : "pet";
+    const data = await authedPost("inventory/use", {
+      roomCode: state.roomCode,
+      inventoryId,
+      targetMode
+    });
+    setMsg(ui.giftMsg, data.data?.message || data.message, true);
+    flashPetReaction();
+    await loadInventory();
+    await fetchRoomState();
+  }
+
+  function flashPetReaction() {
+    const petEmoji = $("#pet-emoji");
+    if (!petEmoji) return;
+    petEmoji.classList.remove("react");
+    void petEmoji.offsetWidth;
+    petEmoji.classList.add("react");
   }
 
   function bindEvents() {
@@ -421,6 +495,15 @@
       }
     });
 
+    $("#open-inventory-btn")?.addEventListener("click", async () => {
+      setActiveView("daily");
+      try {
+        await loadInventory();
+      } catch (err) {
+        setMsg(ui.giftMsg, err.message);
+      }
+    });
+
     $("#timer-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -465,6 +548,16 @@
       }
     });
 
+    $("#pet-name-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await renamePet(new FormData(e.currentTarget));
+        e.currentTarget.reset();
+      } catch (err) {
+        setMsg(ui.petMsg, err.message);
+      }
+    });
+
     $("#decor-choices")?.addEventListener("click", async (e) => {
       const btn = e.target.closest("button[data-item]");
       if (!btn) return;
@@ -472,6 +565,16 @@
         await decorateRoom(btn.dataset.item);
       } catch (err) {
         setMsg(ui.decorMsg, err.message);
+      }
+    });
+
+    $("#inventory-list")?.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".use-item-btn");
+      if (!btn) return;
+      try {
+        await useInventoryItem(btn.dataset.id, btn.dataset.target);
+      } catch (err) {
+        setMsg(ui.giftMsg, err.message);
       }
     });
 
@@ -492,6 +595,7 @@
       if (state.roomCode) {
         try {
           await fetchRoomState();
+          await loadInventory();
           startPolling();
         } catch (e) {
           console.warn(e);

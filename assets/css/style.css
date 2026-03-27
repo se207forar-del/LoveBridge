@@ -212,6 +212,25 @@ h2, h3 {
   font-size: 1.4rem;
 }
 
+.pet-emoji {
+  animation: petIdle 1.8s ease-in-out infinite;
+}
+
+.pet-emoji.react {
+  animation: petReact 0.6s ease-in-out 1;
+}
+
+@keyframes petIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes petReact {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25) rotate(-6deg); }
+  100% { transform: scale(1); }
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -310,6 +329,25 @@ label {
 .tiny {
   font-size: 0.85rem;
   margin-top: 4px;
+}
+
+.draw-result {
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 8px;
+  text-align: center;
+  animation: popIn 260ms ease;
+}
+
+.draw-result.ssr { background: linear-gradient(120deg, #fff3a6, #ffd86a); }
+.draw-result.sr { background: linear-gradient(120deg, #ffd6ec, #ffb3da); }
+.draw-result.r { background: linear-gradient(120deg, #d9f0ff, #b6ddff); }
+.draw-result.n { background: linear-gradient(120deg, #f3f3f3, #e8e8e8); }
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .meter {

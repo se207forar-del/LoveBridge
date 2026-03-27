@@ -58,7 +58,7 @@
         <span id="status-sync" class="sync-badge syncing">同步中</span>
       </div>
 
-      <div class="panel view-panel" data-view="home">
+      <div class="panel view-panel" id="room-panel" data-view="home">
         <h2>配對房間</h2>
         <form id="room-form" class="inline-form">
           <input id="room-code-input" type="text" placeholder="輸入 6 碼房號" maxlength="6" />
@@ -84,8 +84,16 @@
         <section>
           <h3>抽卡 / 禮物</h3>
           <button id="draw-btn">抽一張禮物卡</button>
+          <p id="draw-remain" class="tiny"></p>
+          <div id="draw-result" class="draw-result hidden"></div>
           <p id="gift-msg" class="msg"></p>
+          <button id="open-inventory-btn" class="ghost" type="button">打開物品庫</button>
         </section>
+      </div>
+
+      <div class="panel view-panel" data-view="daily">
+        <h3>物品庫</h3>
+        <ul id="inventory-list" class="list"></ul>
       </div>
 
       <div class="panel view-panel" data-view="home">
@@ -102,6 +110,10 @@
         <section>
           <h3>共養寵物 🐱</h3>
           <div id="pet-card" class="card"></div>
+          <form id="pet-name-form" class="inline-form">
+            <input type="text" name="petName" maxlength="16" placeholder="幫寵物改名字" required />
+            <button type="submit">改名</button>
+          </form>
           <div class="choices">
             <button id="feed-btn" data-food="魚肉罐頭">餵魚肉罐頭</button>
             <button id="feed-snack-btn" data-food="小餅乾">餵小餅乾</button>
